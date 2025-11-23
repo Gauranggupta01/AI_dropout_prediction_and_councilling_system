@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Sentinel - Student Intelligence System</title>
+    
+    <!-- QR Code Library (Required for Attendance Scanner) -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-primary: #0A0D15;
+            --bg-secondary: #1A1F2C;
+            --glass-bg: rgba(26, 31, 44, 0.7);
+            --border-color: rgba(0, 245, 212, 0.25);
+            --text-primary: #E0E0E0;
+            --text-secondary: #8A93A7;
+            --accent-primary: #00F5D4;
+            --accent-secondary: #00A8F5;
+            --risk-high: #FF00A8;
+            --risk-med: #FFD60A;
+            --risk-low: #39D45A;
+            --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            margin: 0;
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+        .hidden { display: none !important; }
+
+        /* --- Dynamic Background --- */
+        #cosmic-background {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+        }
+
+        /* --- Login Screen --- */
+        #login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .portal-box {
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px 40px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            z-index: 1;
+        }
+
+        .portal-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 25px;
+        }
+        .portal-header img { height: 60px; border-radius: 50%; }
+        .portal-header .address { text-align: left; }
+        .portal-header h2 { margin: 0; font-size: 1.2rem; color: var(--accent-primary); }
+        .portal-header p { margin: 0; font-size: 0.9rem; color: var(--text-secondary); }
+
+        .portal-buttons { display: flex; gap: 20px; justify-content: center; }
+        
+        .portal-btn {
+            background-color: var(--bg-secondary);
+            color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.2s ease;
+        }
+        .portal-btn:hover {
+            transform: translateY(-5px);
+            background-color: var(--accent-primary);
+            color: var(--bg-primary);
+            box-shadow: 0 8px 20px rgba(0, 245, 212, 0.3);
+        }
+        .portal-btn svg { width: 40px; height: 40px; }
+
+        /* --- Forms & Inputs --- */
+        .login-box {
+            position: relative;
+            background: transparent;
+            padding: 0;
+            border: none;
+            text-align: center;
+            width: 100%;
+            max-width: 380px;
+            margin: 0 auto;
+        }
+        .back-btn {
+            position: absolute; top: -10px; left: -20px;
+            background: transparent; border: none;
+            color: var(--text-secondary); font-size: 1.8rem;
+            cursor: pointer; transition: color 0.2s; padding: 10px;
+        }
+        .back-btn:hover { color: var(--accent-primary); }
+        
+        .login-form input, .login-form select {
+            width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border-color);
+            border-radius: 8px; box-sizing: border-box; font-size: 16px;
+            background-color: rgba(0,0,0,0.3); color: var(--text-primary);
+        }
+        .login-form button {
+            width: 100%; padding: 14px; border: none; border-radius: 8px;
+            background: linear-gradient(45deg, var(--accent-secondary), var(--accent-primary));
+            color: var(--bg-primary); font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .login-form button:hover { transform: translateY(-2px); box-shadow: 0 0 20px var(--accent-primary); }
+        
+        .auth-toggle { display: flex; align-items: center; justify-content: center; margin-top: 20px; gap: 10px; color: var(--text-secondary); font-size: 14px;}
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-primary); }
+        input:checked + .slider:before { transform: translateX(18px); }
+
+        /* --- Dashboard Styles --- */
+        #counselor-dashboard, #student-dashboard { display: flex; flex-direction: column; height: 100vh; }
+        header { padding: 15px 30px; flex-shrink: 0; background-color: rgba(16, 20, 28, 0.8); backdrop-filter: blur(5px); border-bottom: 1px solid var(--border-color); }
+        .header-content { display: flex; justify-content: space-between; align-items: center; }
+        .header-content h1 { font-size: 24px; color: var(--accent-primary); margin: 0; }
+        .logout-btn { background: transparent; border: 1px solid var(--border-color); color: var(--accent-primary); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s ease; }
+        .logout-btn:hover { background-color: var(--accent-primary); color: var(--bg-primary); box-shadow: 0 0 15px var(--accent-primary); }
+
+        .main-content { display: flex; gap: 30px; flex-grow: 1; overflow: hidden; padding: 30px; }
+        
+        /* Counselor Dashboard Specifics */
+        .students-section { flex-basis: 40%; display: flex; flex-direction: column; gap: 20px; }
+        .deep-dive { flex-basis: 60%; overflow-y: auto; }
+        
+        .students-header { display: flex; justify-content: space-between; align-items: center; padding: 0 10px; }
+        
+        .students-queue { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        
+        .student-card {
+            display: flex; justify-content: space-between; align-items: center; padding: 15px;
+            background: var(--bg-secondary); border-radius: 8px; margin-bottom: 10px;
+            border-left: 5px solid transparent; cursor: pointer; transition: all 0.2s;
+        }
+        .student-card:hover { transform: scale(1.02); background: rgba(255,255,255,0.05); }
+        .student-card.high { border-left-color: var(--risk-high); }
+        .student-card.med { border-left-color: var(--risk-med); }
+        .student-card.low { border-left-color: var(--risk-low); }
+        
+        /* Updated Risk Badge Colors */
+        .risk-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; background: rgba(255,255,255,0.1); }
+        .risk-badge.high { background-color: rgba(255, 0, 168, 0.2); color: var(--risk-high); border: 1px solid var(--risk-high); }
+        .risk-badge.med { background-color: rgba(255, 214, 10, 0.2); color: var(--risk-med); border: 1px solid var(--risk-med); }
+        .risk-badge.low { background-color: rgba(57, 212, 90, 0.2); color: var(--risk-low); border: 1px solid var(--risk-low); }
+
+
+        /* Student Dashboard Specifics */
+        .student-body { display: flex; flex-grow: 1; overflow: hidden; gap: 30px; padding: 30px; }
+        .student-nav { flex-basis: 250px; flex-shrink: 0; }
+        .student-content { flex-grow: 1; overflow-y: auto; padding-right: 15px; }
+        
+        .nav-menu button {
+            display: block; width: 100%; text-align: left; padding: 15px 20px;
+            background: transparent; border: none; color: var(--text-secondary);
+            font-size: 16px; font-weight: 500; cursor: pointer;
+            border-left: 3px solid transparent; transition: all 0.2s;
+        }
+        .nav-menu button:hover { background-color: rgba(0, 245, 212, 0.1); color: var(--accent-primary); }
+        .nav-menu button.active { color: var(--accent-primary); border-left-color: var(--accent-primary); font-weight: 700; background: rgba(0, 245, 212, 0.05); }
+        
+        .content-panel { display: none; }
+        .content-panel.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Profile Grid */
+        .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .profile-group { grid-column: 1 / -1; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .profile-group h3 { margin: 0 0 10px 0; color: var(--accent-secondary); font-size: 1rem; text-transform: uppercase; }
+        
+        .profile-item { background: var(--bg-secondary); padding: 15px; border-radius: 8px; }
+        .profile-item label { font-size: 14px; color: var(--text-secondary); display: block; margin-bottom: 5px; }
+        .profile-item p, .profile-item input { margin: 0; font-size: 16px; font-weight: 500; width: 100%; box-sizing: border-box; background: transparent; border: none; color: var(--text-primary); }
+        .profile-item input { border-bottom: 1px solid var(--accent-primary); padding: 5px 0; }
+
+        /* Chatbot */
+        #chatbot-container { height: 100%; display: flex; flex-direction: column; }
+        .chat-messages { flex-grow: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .chat-message { padding: 10px 15px; border-radius: 18px; max-width: 80%; line-height: 1.4; }
+        .bot-message { background-color: var(--bg-secondary); border-bottom-left-radius: 4px; align-self: flex-start; }
+        .user-message { background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary)); border-bottom-right-radius: 4px; align-self: flex-end; color: white; }
+        #chat-input-form { display: flex; padding: 10px 0; border-top: 1px solid var(--border-color); margin-top: 10px; gap: 10px; }
+        #chat-input { flex-grow: 1; border: none; padding: 10px; border-radius: 8px; background-color: rgba(0,0,0,0.2); color: var(--text-primary); }
+        #chat-send-btn { border: none; border-radius: 8px; padding: 0 20px; cursor: pointer; background-color: var(--accent-primary); color: var(--bg-primary); font-weight: bold;}
+
+        /* Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background: var(--bg-secondary); padding: 30px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; border-radius: 16px; border: 1px solid var(--border-color); }
+        .modal-close-btn { background-color: var(--accent-primary); color: var(--bg-primary); padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; margin-top: 15px; width: 100%; }
+        
+        /* LIME / XAI */
+        .xai-factor { margin-bottom: 15px; }
+        .xai-factor label { display: block; font-size: 0.9rem; margin-bottom: 5px; color: var(--text-secondary); }
+        .progress-bar { width: 100%; height: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+        .progress-bar div { height: 100%; transition: width 0.5s ease; }
+    </style>
+</head>
+<body>
+    <canvas id="cosmic-background"></canvas>
+
+    <div id="login-screen">
+        <div class="portal-box">
+            <div class="portal-header">
+                <img src="https://upload.wikimedia.org/wikipedia/en/c/cf/Iiit-bhopal-logo.png" alt="IIIT Bhopal Logo">
+                <div class="address">
+                    <h2>Indian Institute of Information Technology</h2>
+                    <p>Bhopal, Madhya Pradesh, India - 462003</p>
+                </div>
+            </div>
+            
+            <div id="portal-initial-view">
+                <div class="portal-buttons">
+                    <button class="portal-btn" id="show-counselor-login">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span>Counselor Login</span>
+                    </button>
+                    <button class="portal-btn" id="show-student-login">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-12 0"/><circle cx="12" cy="11" r="4"/><path d="M12 3a8 8 0 0 1 8 8c0 1.44-.39 2.78-.97 3.9"/></svg>
+                        <span>Student Login</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="counselor-login-view" class="hidden">
+                <div class="login-box">
+                    <button class="back-btn">←</button>
+                    <h1>🎓 Counselor Portal</h1>
+                    <form class="login-form" id="counselor-login-form">
+                        <input type="email" id="counselor-username" placeholder="Counselor Email" required>
+                        <input type="password" id="counselor-password" placeholder="Password" required>
+                        <button type="submit" id="counselor-submit-btn">Login as Counselor</button>
+                    </form>
+                    <div id="login-error-counselor" class="hidden" style="color: var(--risk-high); margin-top: 10px;"></div>
+                    <div class="auth-toggle">
+                        <label class="switch"><input type="checkbox" class="auth-mode-toggle" data-role="counselor"><span class="slider"></span></label>
+                        <span>Sign Up Mode</span>
+                    </div>
+                    <div class="login-info" style="margin-top: 15px; font-size: 0.8rem; color: var(--text-secondary);">Authorized Personnel Only</div>
+                </div>
+            </div>
+            
+            <div id="student-login-view" class="hidden">
+                 <div class="login-box">
+                    <button class="back-btn">←</button>
+                    <h1>👤 Student Portal</h1>
+                    <form class="login-form" id="student-login-form">
+                        <input type="email" id="student-email" placeholder="Student Email (e.g., name@college.edu)" required>
+                        <input type="password" id="student-password" placeholder="Password" required>
+                        <button type="submit" id="student-submit-btn">Login as Student</button>
+                    </form>
+                    <div id="login-error-student" class="hidden" style="color: var(--risk-high); margin-top: 10px;"></div>
+                    <div class="auth-toggle">
+                        <label class="switch"><input type="checkbox" class="auth-mode-toggle" data-role="student"><span class="slider"></span></label>
+                        <span>Sign Up Mode</span>
+                    </div>
+                    <div class="login-info" style="margin-top: 15px; font-size: 0.8rem; color: var(--text-secondary);">First time? Toggle Sign Up Mode to verify enrollment.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="counselor-dashboard" class="hidden">
+        <header>
+            <div class="header-content">
+                <h1>Sentinel Dashboard</h1>
+                <button class="logout-btn" onclick="handleLogout()">Logout</button>
+            </div>
+        </header>
+        <div class="main-content">
+            <div class="students-section glass-card" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); backdrop-filter: blur(12px);">
+                <div class="students-header">
+                    <h2>Risk-Priority Queue</h2>
+                </div>
+                <div class="students-queue" id="students-list">
+                    <!-- Students injected by JS -->
+                </div>
+            </div>
+            <div class="deep-dive glass-card" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); backdrop-filter: blur(12px); padding: 20px;">
+                <div id="deep-dive-placeholder" style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-secondary);">
+                    <h2>Select a student to see a detailed breakdown.</h2>
+                </div>
+                <div id="deep-dive-content" class="hidden">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <h2 id="student-detail-title" style="margin:0; color:var(--text-primary);">Student Name</h2>
+                        <div id="risk-badge-large" class="risk-badge" style="background: var(--bg-primary); padding: 8px 16px;">RISK SCORE</div>
+                    </div>
+                    
+                    <div id="counselor-view-profile" style="margin-top:20px; display:grid; grid-template-columns: 1fr 1fr; gap:15px; background:var(--bg-primary); padding:15px; border-radius:12px; font-size:0.9rem;">
+                        <!-- Details injected by JS -->
+                    </div>
+
+                    <div class="xai-panel" style="margin-top:30px;">
+                        <h3 style="color:var(--accent-secondary);">Risk Factors Analysis</h3>
+                        <div id="lime-explanation"></div>
+                    </div>
+                    <!-- Buttons are removed -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="student-dashboard" class="hidden">
+        <header>
+            <div class="header-content">
+                <h1 id="student-welcome">Welcome!</h1>
+                <button class="logout-btn" onclick="handleLogout()">Logout</button>
+            </div>
+        </header>
+        <div class="student-body">
+            <div class="student-nav">
+                <nav class="nav-menu">
+                    <button class="active" onclick="switchTab('profile')">👤 Profile</button>
+                    <button onclick="switchTab('results')">📊 Results</button>
+                    <button onclick="switchTab('fees')">💰 Fees</button>
+                    <button onclick="switchTab('attendance')">✅ Attendance</button>
+                    <button onclick="switchTab('forum')">🌐 Forum</button>
+                    <button id="chatbot-tab-btn" onclick="switchTab('chatbot')">🤖 AI Assistant</button>
+                </nav>
+            </div>
+            <div class="student-content">
+                <div id="profile-panel" class="content-panel active">
+                    <div class="glass-card" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); padding: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin: 0;">Student Profile</h2>
+                            <button class="logout-btn" style="border-color: var(--accent-secondary); color: var(--accent-secondary);" onclick="toggleProfileEdit(this)">✏️ Edit Profile</button>
+                        </div>
+                        <div class="profile-grid" id="profile-details">
+                             <p style="color: var(--text-secondary); grid-column: 1 / -1;">Loading profile data...</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="results-panel" class="content-panel">
+                      <div class="glass-card" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); padding: 20px;">
+                        <h2>Academic Results</h2>
+                        <div style="display:flex; gap:20px; margin-bottom: 20px;">
+                            <div style="background:var(--bg-secondary); padding:15px; border-radius:12px; flex:1; text-align:center;">
+                                <div style="color:var(--text-secondary); font-size:0.9rem;">Current GPA</div>
+                                <div style="font-size:3rem; font-weight:700; color:var(--accent-primary);" id="display-gpa">0.0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="fees-panel" class="content-panel">
+                    <div class="glass-card" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); padding: 20px;">
+                        <h2>Fee Status</h2>
+                        <div id="fees-status-container" class="fees-status due" style="font-size: 1.5rem;">
+                           </div>
+                    </div>
+                </div>
+                <div id="attendance-panel" class="content-panel">
+                    <div class="glass-card" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); padding: 20px;">
+                        <h2>Attendance</h2>
+                        <div style="display:flex; align-items:center; justify-content:center; gap:30px; margin:40px 0;">
+                             <div style="position:relative; width:150px; height:150px; border-radius:50%; border:8px solid var(--bg-secondary); display:flex; align-items:center; justify-content:center;">
+                                <span id="attendance-display" style="font-size:2rem; font-weight:bold; color: var(--accent-primary);">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="forum-panel" class="content-panel">
+                    <div class="glass-card" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); padding: 20px;">
+                        <div id="forum-posts-container" style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;">
+                           </div>
+                        <form id="new-post-form" class="glass-card" style="margin-top: 20px; border: none; background: var(--bg-secondary); padding: 15px;">
+                            <h3>Create New Post</h3>
+                            <textarea id="new-post-content" placeholder="Share your thoughts..." required style="width: 100%; min-height: 80px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: white; padding: 10px; border-radius: 8px;"></textarea>
+                            <button type="submit" class="portal-btn" style="width: auto; padding: 10px 20px; font-size: 1rem; margin-top: 10px;">Post</button>
+                        </form>
+                    </div>
+                </div>
+                <div id="chatbot-panel" class="content-panel">
+                    <div class="glass-card" id="chatbot-container" style="border: 1px solid var(--border-color); border-radius: 16px; background: var(--glass-bg); padding: 20px;">
+                        <h2>AI Assistant <span id="chatbot-status" style="font-size: 0.8rem; color: var(--text-secondary);"></span></h2>
+                        <div class="chat-messages" id="chat-messages"></div>
+                        <form id="chat-input-form">
+                            <input type="text" id="chat-input" placeholder="Ask me anything..." autocomplete="off">
+                            <button id="chat-send-btn" type="submit">Send</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="action-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>Action Logged</h2>
+            <p id="action-message">The action has been logged successfully.</p>
+            <button class="modal-close-btn" onclick="closeModal('action-modal')">Close</button>
+        </div>
+    </div>
+    
+    <div id="enroll-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>Enroll New Student</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px;">Adding a student here pre-registers them in the database. They can then sign up using this email.</p>
+            <form id="enroll-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left;">
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Full Name</label><input type="text" id="enroll-name" required></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Email (Required for Login)</label><input type="email" id="enroll-email" required></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Student Mobile</label><input type="text" id="enroll-mobile" required></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Age</label><input type="number" id="enroll-age" required></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Gender</label>
+                    <select id="enroll-gender" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 12px; color: white;">
+                        <option value="Male">Male</option><option value="Female">Female</option>
+                    </select>
+                </div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Course</label><input type="text" id="enroll-course" required></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Graduation Year</label><input type="number" id="enroll-year" required></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Current GPA</label><input type="number" step="0.1" id="enroll-gpa" required></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Father's Name</label><input type="text" id="enroll-father"></div>
+                <div><label style="color: var(--text-secondary); font-size: 0.9rem;">Mother's Name</label><input type="text" id="enroll-mother"></div>
+                <div style="grid-column: 1 / -1;"><label style="color: var(--text-secondary); font-size: 0.9rem;">Parent Mobile</label><input type="text" id="enroll-parent-mob"></div>
+                <div style="grid-column: 1 / -1;"><label style="color: var(--text-secondary); font-size: 0.9rem;">Address</label><input type="text" id="enroll-address"></div>
+                <button type="submit" class="portal-btn" style="grid-column: 1 / -1; width: 100%; padding: 15px; margin-top: 10px;">Enroll Student</button>
+            </form>
+             <button class="modal-close-btn" onclick="closeModal('enroll-modal')" style="background: transparent; border: 1px solid var(--border-color); margin-top: 10px;">Cancel</button>
+        </div>
+    </div>
+    
+    <script type="module" src="script.js"></script>
+    
+    <script>
+        // Cosmic Background Logic
+        const canvas = document.getElementById('cosmic-background');
+        const ctx = canvas.getContext('2d');
+        let width, height, stars;
+
+        function init() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            stars = [];
+            for (let i = 0; i < 200; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    radius: Math.random() * 1.5 + 0.5,
+                    vx: Math.random() * 0.2 - 0.1,
+                    vy: Math.random() * 0.2 - 0.1
+                });
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = 'white';
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function update() {
+            stars.forEach(star => {
+                star.x += star.vx;
+                star.y += star.vy;
+                if (star.x < 0 || star.x > width) star.vx = -star.vx;
+                if (star.y < 0 || star.y > height) star.vy = -star.vy;
+            });
+        }
+
+        function animate() {
+            draw();
+            update();
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', init);
+        init();
+        animate();
+
+        // Navigation helpers (Basic UI switching)
+        document.querySelectorAll('.back-btn').forEach(b => {
+            b.addEventListener('click', () => {
+                document.getElementById('portal-initial-view').classList.remove('hidden');
+                document.getElementById('counselor-login-view').classList.add('hidden');
+                document.getElementById('student-login-view').classList.add('hidden');
+                // Reset forms on back
+                document.getElementById('student-login-form').reset();
+                document.getElementById('counselor-login-form').reset();
+            });
+        });
+        document.getElementById('show-counselor-login').onclick = () => {
+            document.getElementById('portal-initial-view').classList.add('hidden');
+            document.getElementById('counselor-login-view').classList.remove('hidden');
+        };
+        document.getElementById('show-student-login').onclick = () => {
+            document.getElementById('portal-initial-view').classList.add('hidden');
+            document.getElementById('student-login-view').classList.remove('hidden');
+        };
+    </script>
+</body>
+</html>
